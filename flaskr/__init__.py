@@ -1,6 +1,6 @@
 import os
 from flask import Flask
-from werkzeug.contrib.fixers import ProxyFix
+# from werkzeug.contrib.fixers import ProxyFix
 from flask_cors import CORS
 
 

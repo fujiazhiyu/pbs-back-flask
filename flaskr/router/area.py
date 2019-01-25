@@ -2,7 +2,7 @@
 
 from flask import (jsonify, request)
 from flaskr.router import areas
-from flaskr import service
+from flaskr.service import service
 
 
 @areas.route('/preset', methods=['GET'])

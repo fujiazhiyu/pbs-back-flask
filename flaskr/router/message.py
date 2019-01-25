@@ -3,7 +3,7 @@
 from flask import (jsonify, request)
 from flaskr.router import messages
 # from flask_cors import cross_origin
-from flaskr import service
+from flaskr.service import service
 import sys
 
 

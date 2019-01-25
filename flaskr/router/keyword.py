@@ -2,7 +2,7 @@
 
 from flask import (jsonify, request)
 from flaskr.router import keywords
-from flaskr import service
+from flaskr.service import service
 
 
 @keywords.route('/all', methods=['GET'])

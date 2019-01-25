@@ -2,10 +2,10 @@
 
 from flask import (jsonify, request)
 from flaskr.router import infos
-from flaskr import service
+from flaskr.service import service
 
 
 @infos.route('/contacts', methods=['GET'])
 def getDataset():
-    result = service.pickContacts(request.args.to_dict(flat=False))
+    result = service.pickData(request.args.to_dict(flat=False), 'contacts')
     return jsonify(result)

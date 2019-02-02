@@ -1,35 +1,34 @@
 import asyncio
 import aiohttp
-import json
 import logging
 
-logging.basicConfig(filename='asynCrawl.log', level=logging.INFO)
+logging.basicConfig(filename='asynCrawl.log', level=logging.ERROR)
 
 
 class AsnycGrab(object):
 
     def __init__(self, url_list, max_threads):
         self.urls = url_list
-        self.results = {}
+        self.results = {"num": 0, "data": {}}
         self.max_threads = max_threads
 
-    def __parse_results(self, url, resJson):
+    def __parse_results(self, serial, resJson):
         if resJson:
-            self.results[url] = resJson
+            self.results["data"][serial] = resJson
+            self.results["num"] += 1
         else:
             print('None...')
 
     async def get_body(self, url):
         async with aiohttp.ClientSession() as session:
-            print(url["payload"])
-            async with session.post(url["batch_url"], json=url["payload"], timeout=1) as response:
+            async with session.post(url["batch_url"], json=url["payload"], timeout=2) as response:
                 assert response.status == 200
                 resJson = await response.json(encoding='utf8')
-                return response.url, resJson
+                return url["serial"], resJson
 
     async def get_results(self, url):
-        url, resJson = await self.get_body(url)
-        self.__parse_results(url, resJson)
+        serial, resJson = await self.get_body(url)
+        self.__parse_results(serial, resJson)
         return 'Completed'
 
     async def handle_tasks(self, task_id, work_queue):
@@ -38,15 +37,17 @@ class AsnycGrab(object):
             try:
                 task_status = await self.get_results(current_url)
             except Exception as e:
-                logging.exception('Error for {}'.format(current_url), exc_info=True)
+                logging.exception('Error for {}'.format(current_url["serial"]), exc_info=True)
+                work_queue.put_nowait(current_url)
 
     def eventloop(self):
+        new_loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(new_loop)
         q = asyncio.Queue()
         [q.put_nowait(url) for url in self.urls]
-        loop = asyncio.get_event_loop()
         tasks = [self.handle_tasks(task_id, q, ) for task_id in range(self.max_threads)]
-        loop.run_until_complete(asyncio.wait(tasks))
-        loop.close()
+        new_loop.run_until_complete(asyncio.wait(tasks))
+        new_loop.close()
 
 
 if __name__ == '__main__':

@@ -9,7 +9,6 @@ from flaskr.service import service
 # @cross_origin(supports_credentials=True)
 def postPaths():
     params = request.get_json()
-    # results = service.pickData(params, 'recommend')
-    # print(len(results["data"]))
-    # return jsonify(results)
-    return jsonify(params)
+    results = service.pickData(params, 'recommend')
+    return jsonify(results)
+    # return jsonify(params)

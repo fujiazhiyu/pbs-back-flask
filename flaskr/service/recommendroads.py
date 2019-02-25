@@ -1,8 +1,9 @@
+# coding:utf-8
 from flaskr.db import MessageInfo
 from sklearn.cluster import DBSCAN
 import pandas as pd, numpy as np
 from math import *
-import asyncio
+from .refineroads import refineRoads, get_distance
 from collections import Counter
 from .asynroadinfo import generateURLS, crawlInfo
 
@@ -20,11 +21,14 @@ def recommendRoads(params):
     roadsinfo = crawlInfo(generateURLS(results))
     impactedroads = integrateRoads(roadsinfo["data"], results, params["keywords_weights"])
     # selectedRoads = roadsPointsGroup(impactedroads)
+    # refinedroads = refineRoads(selectedRoads)
     res = {
         "status": 'success',
         "pointcount": len(results),
         "roadcount": len(impactedroads.keys()),
         "data": impactedroads
+        # "data": selectedRoads
+        # "data": refinedroads
     }
     return res
 
@@ -49,9 +53,9 @@ def integrateRoads(roadsInfo, results, keywords_weights):
                     for road in point["roads"]:
                         kwsStr = results[selected_pointsIndex]["keywords"]
                         keywords = kwsStr.split(';') if kwsStr else ""
-                        pointContr, KWContrs = keywordContributions(keywords, keywords_weights, float(road["distance"]))
+                        pointContrs, KWContrs = keywordContributions(keywords, keywords_weights, float(road["distance"]))
                         road["keywords"] = KWContrs
-                        road["contribution"] = pointContr
+                        road["contribution"] = pointContrs
                         road["pointId"] = results[selected_pointsIndex]["id"]
                         if road["id"] in impactedRoads:     # 如果有此键
                             merge2road(impactedRoads[road["id"]], road)
@@ -63,9 +67,11 @@ def integrateRoads(roadsInfo, results, keywords_weights):
                             impactedRoads[road["id"]]["weight"] = road["contribution"]
                             impactedRoads[road["id"]]["keywords"] = Counter(road["keywords"])
 
+    # 消除点密度对其的影响, 除以点个数
     for roadId, roadInfo in impactedRoads.items():
         for keyword, keywordContr in roadInfo["keywords"].items():
             roadInfo["keywords"][keyword] = keywordContr / len(roadInfo["pointIds"])
+        # locations 去重,相同累加取平均
         countLoc = Counter([loc[0] for loc in roadInfo["locations"]])
         locDict = Counter({})
         for loc in roadInfo["locations"]:
@@ -74,7 +80,7 @@ def integrateRoads(roadsInfo, results, keywords_weights):
             locDict[k] /= countLoc[k]
         roadInfo["locations"] = locDict
         roadInfo["weight"] /= len(locDict.keys())
-        
+
     return impactedRoads
 
 
@@ -89,18 +95,19 @@ def merge2road(totalroad, newroad):
 
 def keywordContributions(keywords, keywords_weights, distance):
     KWContrs = {}
-    disContrs = 0
+    pointContrs = 0
     for kw in keywords:
         if kw in keywords_weights:
-            sigKW = (keywords_weights[kw] - 50) * 2 + 50 * 1.5
+            sigKW = (keywords_weights[kw] - 50) * 0.2 + 5 * 1.5
         else:
-            sigKW = 50
+            sigKW = 5
         disImpact = 200 / (distance)
         KWContrs[kw] = sigKW
-        # disContrs += sigKW + disImpact
-        disContrs += disImpact
+        # pointContrs += (sigKW + disImpact)
+        pointContrs += disImpact
 
-    return disContrs, KWContrs
+    return pointContrs, KWContrs
+    # return pointContrs, KWContrs
 
 
 def roadsPointsGroup(roads):
@@ -125,18 +132,3 @@ def pointsClustering(locations):
     values = set(map(lambda x: x[0], locgroup))
     newlist = [dict([y[1] for y in locgroup if y[0] == x]) for x in values]
     return list(zip([sum(nl.values()) for nl in newlist], newlist))
-
-
-def get_distance(array_1, array_2):
-    lon_a = array_1[0]
-    lat_a = array_1[1]
-    lon_b = array_2[0]
-    lat_b = array_2[1]
-    radlat1 = radians(lat_a)
-    radlat2 = radians(lat_b)
-    a = radlat1 - radlat2
-    b = radians(lon_a) - radians(lon_b)
-    s = 2 * asin(sqrt(pow(sin(a/2),2) + cos(radlat1) * cos(radlat2)*pow(sin(b/2),2)))
-    earth_radius = 6378137
-    s = s * earth_radius
-    return s
